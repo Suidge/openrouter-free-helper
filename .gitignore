@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Data files (contain sensitive info)
+data/*.json
+
+# Config (user-specific)
+config/config.json
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
