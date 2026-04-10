@@ -14,8 +14,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/openclaw/openclaw",
-    "directory": "skills/openrouter-free-helper"
+    "url": "https://github.com/Suidge/openrouter-free-helper.git"
   },
   "homepage": "https://clawhub.ai/skills/openrouter-free-helper",
   "engines": {
