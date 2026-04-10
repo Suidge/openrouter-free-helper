@@ -1,0 +1,7 @@
+{
+  "check_time": "08:00",
+  "notify_channel": "feishu",
+  "notify_target": "user:ou_8072af0701714ee36e1e66d6690be4d7",
+  "status_file": "/Users/neoshi/.openclaw/workspace/skills/openrouter-free-helper/data/status.json",
+  "openclaw_config": "/Users/neoshi/.openclaw/openclaw.json"
+}

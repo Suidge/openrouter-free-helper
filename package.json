@@ -1,0 +1,51 @@
+{
+  "name": "openrouter-free-helper",
+  "version": "1.0.0",
+  "description": "监控 OpenRouter 免费模型的到期通知和新模型发现，自动每日检查并推送飞书通知",
+  "author": "Neo Shi <neoshi2346>",
+  "license": "MIT",
+  "keywords": [
+    "openrouter",
+    "free-models",
+    "monitor",
+    "notification",
+    "feishu",
+    "llm"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openclaw/openclaw",
+    "directory": "skills/openrouter-free-helper"
+  },
+  "homepage": "https://clawhub.ai/skills/openrouter-free-helper",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "bb-browser": ">=0.11.0"
+  },
+  "pythonDependencies": {
+    "requests": ">=2.31.0",
+    "beautifulsoup4": ">=4.12.0"
+  },
+  "scripts": {
+    "check": "python3 scripts/check-models.py --verbose",
+    "dry-run": "python3 scripts/check-models.py --verbose --dry-run"
+  },
+  "clawhub": {
+    "category": "automation",
+    "tags": ["monitoring", "notification", "llm", "openrouter"],
+    "features": [
+      "自动监控 OpenRouter 免费模型到期通知",
+      "新模型发现与推送",
+      "分级提醒机制（紧急/警告/预告）",
+      "智能去重，避免重复通知",
+      "自动 Chrome 调试模式管理",
+      "多层 fallback 保证可靠性"
+    ],
+    "requirements": {
+      "bins": ["python3", "bb-browser"],
+      "browser": "Chrome (debug mode, port 9222)"
+    }
+  }
+}
