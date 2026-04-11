@@ -80,6 +80,42 @@ git clone https://github.com/Suidge/openrouter-free-helper.git \
   ~/.openclaw/workspace/skills/openrouter-free-helper
 ```
 
+### 添加 Cron 自动检查 | Add a Scheduled Cron Check
+
+> 安装 skill **不会自动创建 Cron**。如果你需要每日自动运行，请手动添加。  
+> Installing the skill does **not** auto-create a Cron job. Add it manually if you want scheduled checks.
+
+示例：每日 08:00 检查并投递到飞书  
+Example: run daily at 08:00 and deliver to Feishu
+
+```bash
+openclaw cron add --job '{
+  "id": "openrouter-monitor-001",
+  "name": "OpenRouter Free Model Monitor",
+  "schedule": {"kind": "cron", "expr": "0 8 * * *", "tz": "Asia/Shanghai"},
+  "sessionTarget": "isolated",
+  "wakeMode": "now",
+  "payload": {
+    "kind": "agentTurn",
+    "message": "Read /Users/neoshi/.openclaw/workspace/skills/openrouter-free-helper/references/cron-task.md and follow it exactly. Keep the run self-contained in an isolated session rooted at /Users/neoshi/.openclaw/workspace. Return only a brief plain-text summary suitable for Feishu delivery.",
+    "timeoutSeconds": 300
+  },
+  "delivery": {
+    "mode": "announce",
+    "channel": "feishu",
+    "to": "user:ou_xxxxxxxxxxxxxxxxxxxxx"
+  }
+}'
+```
+
+检查状态  
+Check status
+
+```bash
+openclaw cron list
+openclaw cron runs --jobId openrouter-monitor-001
+```
+
 ### 配置 | Configuration
 
 编辑配置文件 | Edit config file `config/config.json`:
@@ -290,6 +326,11 @@ The local Python script no longer pretends to call OpenClaw tools via subprocess
 ---
 
 ## 📝 更新日志 | Changelog
+
+### v1.0.4 (2026-04-11)
+- 📝 Clarify that installing the skill does not auto-create a Cron job
+- ➕ Add explicit `openclaw cron add` setup guidance to README and SKILL.md
+- 🔗 Point scheduled runs to `references/cron-task.md`
 
 ### v1.0.3 (2026-04-11)
 - 🔧 Fix configured free-model lookup to read `agents.defaults.models`

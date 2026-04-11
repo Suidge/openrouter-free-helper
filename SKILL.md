@@ -75,11 +75,33 @@ clawhub install openrouter-free-helper
 
 ### 启用自动化
 
-技能安装后会自动添加 Cron 任务，每日 08:00 执行检查。
+技能安装后**不会自动创建 Cron 任务**。如需每日自动检查，请手动添加一条 Cron，并让它读取固定任务说明文件。
 
-手动检查 Cron 状态：
+示例：每日 08:00 执行
+```bash
+openclaw cron add --job '{
+  "id": "openrouter-monitor-001",
+  "name": "OpenRouter Free Model Monitor",
+  "schedule": {"kind": "cron", "expr": "0 8 * * *", "tz": "Asia/Shanghai"},
+  "sessionTarget": "isolated",
+  "wakeMode": "now",
+  "payload": {
+    "kind": "agentTurn",
+    "message": "Read /Users/neoshi/.openclaw/workspace/skills/openrouter-free-helper/references/cron-task.md and follow it exactly. Keep the run self-contained in an isolated session rooted at /Users/neoshi/.openclaw/workspace. Return only a brief plain-text summary suitable for Feishu delivery.",
+    "timeoutSeconds": 300
+  },
+  "delivery": {
+    "mode": "announce",
+    "channel": "feishu",
+    "to": "user:ou_xxxxxxxxxxxxxxxxxxxxx"
+  }
+}'
+```
+
+检查 Cron 状态：
 ```bash
 openclaw cron list
+openclaw cron runs --jobId openrouter-monitor-001
 ```
 
 ---
