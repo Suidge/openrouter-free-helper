@@ -39,9 +39,10 @@ This tool is designed as an OpenClaw skill, supporting daily automated checks wi
 | 中文 | English |
 |------|---------|
 | 🚨 **分级提醒** - 紧急 (≤1 天) / 警告 (≤3 天) / 预告 (>3 天) | 🚨 **Tiered Alerts** - Urgent (≤1 day) / Warning (≤3 days) / Notice (>3 days) |
-| 🔕 **智能去重** - 避免重复推送相同通知 | 🔕 **Smart Deduplication** - Avoids duplicate notifications |
-| 🌐 **三层抓取** - requests → web_fetch → bb-browser | 🌐 **3-Layer Fallback** - requests → web_fetch → bb-browser |
-| 🤖 **自动 Chrome** - 智能管理 Chrome 调试模式 | 🤖 **Auto Chrome** - Intelligent Chrome debug mode management |
+| 🔕 **智能去重** - 仅首次发现、日期变化或严重级别升级时提醒 | 🔕 **Smart Deduplication** - Alerts only on first discovery, date changes, or severity upgrades |
+| 🌐 **诚实抓取链路** - requests → urllib | 🌐 **Honest Fetch Chain** - requests → urllib |
+| 🔎 **双路发现** - bb-browser 优先，失败回退 OpenRouter API | 🔎 **Dual Discovery Path** - bb-browser first, OpenRouter API fallback |
+| 🤖 **自动 Chrome** - 仅用于增强发现链路，不再依赖它完成全部抓取 | 🤖 **Auto Chrome** - Used only for enhanced discovery, no longer required for all fetching |
 | 📅 **定时检查** - 支持 Cron 每日自动执行 | 📅 **Scheduled Checks** - Supports daily Cron automation |
 | 📱 **飞书通知** - 无缝集成飞书消息推送 | 📱 **Feishu Integration** - Seamless Feishu message notifications |
 
@@ -52,16 +53,16 @@ This tool is designed as an OpenClaw skill, supporting daily automated checks wi
 ### 前置要求 | Prerequisites
 
 ```bash
-# 1. 安装 bb-browser (必需 | Required)
+# 1. 安装 bb-browser (可选 | Optional, for enhanced discovery)
 brew install bb-browser
 # 或 | Or: npm install -g bb-browser
 
 # 2. Python 依赖 | Python Dependencies
-pip3 install requests beautifulsoup4
+pip3 install requests
 
 # 3. Chrome 调试模式 | Chrome Debug Mode
-# 脚本会自动启动，或手动运行：
-# Script auto-starts, or manually run:
+# 仅当你想启用 bb-browser 增强发现时需要。
+# Only needed when you want bb-browser based enhanced discovery.
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
   --remote-debugging-port=9222
 ```
@@ -134,16 +135,10 @@ cat data/status.json
 **示例输出 | Example Output**:
 ```json
 {
-  "last_check": "2026-04-10T21:59:06.858640",
+  "last_check": "2026-04-11T08:26:03.179157+08:00",
   "known_models": ["openrouter/google/gemma-4-26b-a4b-it:free"],
-  "expiring_soon": [
-    {
-      "model": "arcee-ai/trinity-large-preview",
-      "going_away_date": "2026-04-22",
-      "days_left": 11,
-      "url": "https://openrouter.ai/arcee-ai/trinity-large-preview"
-    }
-  ]
+  "expiring_soon": [],
+  "fetch_errors": []
 }
 ```
 
@@ -221,8 +216,9 @@ openrouter-free-helper/
 │   └── status.json              # 状态文件 (自动生成) | Status file (auto-generated)
 ├── scripts/
 │   ├── check-models.py          # 主检查脚本 | Main check script
-│   └── fetch_page.py            # 网页抓取模块 | Web scraping module
+│   └── fetch_page.py            # 网页抓取模块 | Web scraping helper
 └── references/
+    ├── cron-task.md             # Cron 任务说明 | Cron task instructions
     └── openrouter-structure.md  # OpenRouter 结构分析 | OpenRouter structure analysis
 ```
 
@@ -242,16 +238,18 @@ Change `0 8 * * *` to other time (e.g., hourly: `0 * * * *`)
 
 ### 添加更多监控模型 | Add More Monitored Models
 
-编辑 `~/.openclaw/openclaw.json`，在 `defaults.models` 或 `agents[].model` 中添加 `:free` 后缀的模型 ID：
+编辑 `~/.openclaw/openclaw.json`，在 `agents.defaults.models` 或 `agents[].model` 中添加 `:free` 后缀的模型 ID：
 
-Edit `~/.openclaw/openclaw.json`, add `:free` suffixed model IDs in `defaults.models` or `agents[].model`:
+Edit `~/.openclaw/openclaw.json`, add `:free` suffixed model IDs in `agents.defaults.models` or `agents[].model`:
 
 ```json
 {
-  "defaults": {
-    "models": {
-      "openrouter/google/gemma-4-26b-a4b-it:free": {...},
-      "openrouter/google/gemma-4-31b-it:free": {...}
+  "agents": {
+    "defaults": {
+      "models": {
+        "openrouter/google/gemma-4-26b-a4b-it:free": {},
+        "openrouter/google/gemma-4-31b-it:free": {}
+      }
     }
   }
 }
@@ -264,16 +262,20 @@ The script will automatically identify and monitor these models' expiration stat
 
 ## 📊 技术实现 | Technical Implementation
 
-### 三层抓取 Fallback | 3-Layer Fetch Fallback
+### 页面抓取链路 | Page Fetch Chain
 
-1. **Layer 1**: `requests` + BeautifulSoup (静态内容 | Static content)
-2. **Layer 2**: `web_fetch` 工具 (备用 | Backup)
-3. **Layer 3**: `bb-browser` 适配器 (动态内容 | Dynamic content)
+1. **Layer 1**: `requests` (首选 | preferred)
+2. **Layer 2**: `urllib` (标准库兜底 | stdlib fallback)
 
-### API Fallback
+本地 Python 脚本不再伪装调用 OpenClaw 工具。  
+The local Python script no longer pretends to call OpenClaw tools via subprocess shims.
 
-当浏览器自动化失败时，降级使用 OpenRouter 内部 API：  
-When browser automation fails, fallback to OpenRouter internal API:
+### 新模型发现链路 | New Model Discovery Path
+
+1. 优先使用 `bb-browser site openrouter/free-models --json --openclaw`  
+   First try `bb-browser site openrouter/free-models --json --openclaw`
+2. 若失败，回退 OpenRouter 内部 API  
+   If that fails, fall back to OpenRouter internal API
 
 - **端点 | Endpoint**: `https://openrouter.ai/api/frontend/models`
 - **无需认证 | No auth required**
@@ -283,11 +285,19 @@ When browser automation fails, fallback to OpenRouter internal API:
 - ✅ 自动检测 Chrome 调试模式状态 | Auto-detect Chrome debug mode status
 - ✅ 端口探活验证 | Port probing verification
 - ✅ 独立 profile 避免冲突 | Isolated profile to avoid conflicts
-- ✅ 不干扰用户现有 Chrome 会话 | No interference with existing Chrome sessions
+- ✅ 仅服务于增强发现链路 | Used only for enhanced discovery
 
 ---
 
 ## 📝 更新日志 | Changelog
+
+### v1.0.3 (2026-04-11)
+- 🔧 Fix configured free-model lookup to read `agents.defaults.models`
+- 🛡 Add safer JSON/status loading and preserve known model state on partial failures
+- 🔕 Tighten expiration dedup logic to avoid repeated daily warning spam
+- 🌐 Replace misleading multi-tool fetch shim with an honest `requests -> urllib` fallback chain
+- 📝 Sync README and SKILL docs with actual runtime behavior
+- ➕ Add `references/cron-task.md` for cron-safe task guidance
 
 ### v1.0.2 (2026-04-10)
 - 🌐 Add GitHub repository

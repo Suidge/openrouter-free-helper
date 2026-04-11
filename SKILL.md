@@ -17,7 +17,7 @@ allowed-tools: Bash, exec
 
 ### 前置依赖
 
-**1. 安装 bb-browser**（必需）
+**1. 安装 bb-browser**（可选，用于增强发现链路）
 
 ```bash
 # 使用 Homebrew 安装
@@ -220,6 +220,7 @@ pip3 install requests beautifulsoup4
 │   ├── check-models.py           # 主检查脚本
 │   └── fetch_page.py             # 网页抓取模块
 ├── references/
+│   ├── cron-task.md              # Cron 任务说明
 │   └── openrouter-structure.md   # OpenRouter 结构分析
 └── adapters/
     └── openrouter/               # bb-browser 适配器（在 ~/.bb-browser/sites/）
@@ -259,24 +260,25 @@ openclaw cron edit
 
 ## 📊 技术实现
 
-### 三层抓取 fallback
+### 页面抓取策略
 
-1. **Layer 1**: `requests` + BeautifulSoup（静态内容）
-2. **Layer 2**: `web_fetch` 工具（备用）
-3. **Layer 3**: `bb-browser` 适配器（动态内容）
+1. **Layer 1**: `requests`（优先，稳定且快速）
+2. **Layer 2**: `urllib`（标准库兜底）
 
-### API fallback
+说明：本地 Python 脚本不再伪装调用 OpenClaw 工具。工具型抓取属于 agent 运行期能力，不应在脚本里用 subprocess 硬模拟。
 
-当浏览器自动化失败时，降级使用 OpenRouter 内部 API：
-- 端点：`https://openrouter.ai/api/frontend/models`
-- 无需认证，直接返回免费模型列表
+### 新模型发现链路
 
-### 智能 Chrome 管理
+1. 优先尝试 `bb-browser site openrouter/free-models --json --openclaw`
+2. 若失败，则回退到 OpenRouter 内部 API：
+   - 端点：`https://openrouter.ai/api/frontend/models`
+   - 无需认证，可直接提取免费模型列表
 
-- 自动检测 Chrome 调试模式状态
-- 端口探活验证（`http://127.0.0.1:9222/json/version`）
-- 独立 profile 避免冲突（`/tmp/openclaw-chrome-debug`）
-- 不干扰用户现有 Chrome 会话
+### Chrome 调试模式管理
+
+- 自动检测 Chrome 调试端口是否可用（`http://127.0.0.1:9222/json/version`）
+- 若不可用，可启动独立 profile：`/tmp/openclaw-chrome-debug`
+- 设计目标是不干扰用户现有 Chrome 会话
 
 ---
 
@@ -292,6 +294,13 @@ openclaw cron edit
 ---
 
 ## 📝 更新日志
+
+### v1.0.1 (2026-04-11)
+- 修正配置模型读取路径
+- 修正状态文件与 JSON 读取容错
+- 收紧到期提醒去重策略，避免重复提醒
+- 精简抓取链路，改为 requests + urllib 的诚实 fallback
+- 新增 cron-task.md 作为 cron 固定任务说明
 
 ### v1.0.0 (2026-04-10)
 - 初始版本发布

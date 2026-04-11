@@ -14,26 +14,30 @@ import os
 import re
 import sys
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 
 # Import fetch module
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
     from fetch_page import fetch_page
 except ImportError:
-    # Fallback: define inline
     def fetch_page(url, verbose=False):
-        import requests
-        from bs4 import BeautifulSoup
         try:
+            import requests
             headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
             resp = requests.get(url, headers=headers, timeout=15)
             if resp.status_code == 200:
                 return resp.text
-        except:
-            pass
+        except Exception as e:
+            if verbose:
+                print(f"  ⚠ Inline fetch fallback failed: {e}")
         return None
 
 # Paths
@@ -46,7 +50,7 @@ OPENCLAW_CONFIG = Path.home() / ".openclaw" / "openclaw.json"
 # OpenRouter URL patterns
 OPENROUTER_BASE = "https://openrouter.ai"
 MODEL_URL_TEMPLATE = f"{OPENROUTER_BASE}/{{model_id}}"
-FREE_MODELS_LIST_URL = f"{OPENROUTER_BASE}/models?max_price=0"
+SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 
 
 def load_config() -> dict:
@@ -90,12 +94,22 @@ def save_status(status: dict):
     """Save check status"""
     config = load_config()
     status_path = Path(config.get("status_file", str(STATUS_FILE)))
-    
+
     # Ensure directory exists
     status_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     with open(status_path, 'w') as f:
         json.dump(status, f, indent=2, ensure_ascii=False)
+
+
+def safe_load_json(path: Path) -> dict:
+    """Load JSON file safely, return empty dict on failure."""
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"⚠️ JSON load failed for {path}: {e}", file=sys.stderr)
+        return {}
 
 
 def get_configured_free_models() -> List[str]:
@@ -107,13 +121,14 @@ def get_configured_free_models() -> List[str]:
         print(f"ERROR: OpenClaw config not found: {openclaw_config_path}", file=sys.stderr)
         return []
     
-    with open(openclaw_config_path) as f:
-        data = json.load(f)
+    data = safe_load_json(openclaw_config_path)
+    if not data:
+        return []
     
     free_models = []
     
-    # Check defaults.models
-    models_section = data.get("defaults", {}).get("models", {})
+    # Check agents.defaults.models
+    models_section = data.get("agents", {}).get("defaults", {}).get("models", {})
     for model_id in models_section.keys():
         if model_id.endswith(":free"):
             free_models.append(model_id)
@@ -131,8 +146,8 @@ def get_configured_free_models() -> List[str]:
             if fb.endswith(":free"):
                 free_models.append(fb)
     
-    # Deduplicate
-    return list(set(free_models))
+    # Deduplicate while preserving stable order
+    return sorted(set(free_models))
 
 
 def check_expiration_notice(model_id: str, verbose: bool = False) -> Optional[Dict]:
@@ -142,11 +157,6 @@ def check_expiration_notice(model_id: str, verbose: bool = False) -> Optional[Di
         - dict with expiration info if found
         - None if no notice or fetch failed (logged separately)
     """
-    try:
-        from zoneinfo import ZoneInfo
-    except ImportError:
-        from backports.zoneinfo import ZoneInfo
-    
     url = MODEL_URL_TEMPLATE.format(model_id=model_id)
     
     if verbose:
@@ -156,7 +166,11 @@ def check_expiration_notice(model_id: str, verbose: bool = False) -> Optional[Di
     if not html:
         if verbose:
             print(f"  ⚠️ Fetch failed for {model_id}")
-        return None  # Treat fetch failure as "no notice" to avoid false alerts
+        return {
+            "model": model_id,
+            "error": "fetch_failed",
+            "url": url
+        }
     
     # Search for "Going away" pattern
     # Patterns: "Going away April 22, 2026" or "Going away 2026 年 4 月 22 日"
@@ -185,10 +199,9 @@ def check_expiration_notice(model_id: str, verbose: bool = False) -> Optional[Di
             
             # Calculate days remaining (use Asia/Shanghai timezone)
             try:
-                tz = ZoneInfo("Asia/Shanghai")
-                expire_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=tz)
-                days_left = (expire_date - datetime.now(tz)).days
-            except:
+                expire_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=SHANGHAI_TZ)
+                days_left = (expire_date - datetime.now(SHANGHAI_TZ)).days
+            except Exception:
                 days_left = 0
             
             return {
@@ -227,7 +240,6 @@ def ensure_chrome_debug_mode(verbose: bool = False) -> bool:
     
     # Try to start Chrome in debug mode with isolated profile
     try:
-        # Use isolated profile to avoid conflicts with existing Chrome
         chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
         profile_dir = "/tmp/openclaw-chrome-debug"
         
@@ -320,6 +332,7 @@ def discover_new_models(verbose: bool = False) -> List[str]:
                     endpoint = m.get("endpoint") or {}
                     if endpoint.get("is_free") and m.get("slug"):
                         api_models.append(m.get("slug", ""))
+                api_models = sorted(set(api_models))
                 if verbose:
                     print(f"  ✓ API: Found {len(api_models)} free models")
                 return api_models
@@ -344,9 +357,6 @@ def send_feishu_notification(message: str, dry_run: bool = False):
     
     # Use OpenClaw message tool
     try:
-        # Extract user ID from target (e.g., "user:ou_xxx" -> "ou_xxx")
-        user_id = target.replace("user:", "") if target.startswith("user:") else target
-        
         cmd = [
             "openclaw", "message", "send",
             "--channel", "feishu",
@@ -410,7 +420,7 @@ def format_notification(expiring: List[Dict], new_models: List[str], alert_level
         if len(new_models) > 10:
             lines.append(f"... 还有 {len(new_models) - 10} 个新模型")
     
-    lines.append(f"检查时间：{datetime.now().strftime('%Y-%m-%d %H:%M')} (Asia/Shanghai)")
+    lines.append(f"检查时间：{datetime.now(SHANGHAI_TZ).strftime('%Y-%m-%d %H:%M')} (Asia/Shanghai)")
     
     return "\n".join(lines)
 
@@ -420,44 +430,86 @@ def should_send_expiration_alert(current_expiring: List[Dict], previous_expiring
     Determine if expiration alert should be sent.
     Returns (should_send, alert_level)
     alert_level: "urgent" (≤1 天), "warning" (≤3 天), "normal" (first notice)
+
+    Rules:
+    - first discovery -> send
+    - date change -> send
+    - severity upgrade -> send
+    - same warning/urgent state as last time -> do not repeat daily
     """
     if not current_expiring:
         return False, "normal"
-    
-    # Build lookup for previous state
+
     prev_lookup = {}
     for item in (previous_expiring or []):
         model_id = item.get("model")
         if model_id:
             prev_lookup[model_id] = item
-    
+
     should_send = False
     max_alert_level = "normal"
-    
+
     for item in current_expiring:
         model = item.get("model")
         days_left = item.get("days_left", 999)
-        
-        # Check if this is a new expiring model or date changed
+        previous = prev_lookup.get(model, {})
+
         if model not in prev_lookup:
-            should_send = True  # New expiring model
-        elif prev_lookup[model].get("going_away_date") != item.get("going_away_date"):
-            should_send = True  # Date changed
-        
-        # Determine alert level based on days left
-        if days_left is not None:
-            try:
-                days = int(days_left)
-                if days <= 1:
-                    max_alert_level = "urgent"
-                    should_send = True  # Always send urgent alerts
-                elif days <= 3 and max_alert_level != "urgent":
-                    max_alert_level = "warning"
-                    should_send = True  # Send warning alerts
-            except (ValueError, TypeError):
-                pass
-    
+            should_send = True
+        elif previous.get("going_away_date") != item.get("going_away_date"):
+            should_send = True
+
+        try:
+            days = int(days_left)
+        except (ValueError, TypeError):
+            continue
+
+        prev_days = previous.get("days_left")
+        try:
+            prev_days = int(prev_days) if prev_days is not None else None
+        except (ValueError, TypeError):
+            prev_days = None
+
+        current_level = "normal"
+        previous_level = "normal"
+
+        if days <= 1:
+            current_level = "urgent"
+        elif days <= 3:
+            current_level = "warning"
+
+        if prev_days is not None:
+            if prev_days <= 1:
+                previous_level = "urgent"
+            elif prev_days <= 3:
+                previous_level = "warning"
+
+        if current_level == "urgent":
+            max_alert_level = "urgent"
+        elif current_level == "warning" and max_alert_level != "urgent":
+            max_alert_level = "warning"
+
+        if current_level != previous_level and current_level in {"urgent", "warning"}:
+            should_send = True
+
     return should_send, max_alert_level
+
+
+def summarize_check_result(expiring: List[Dict], new_models: List[str], fetch_errors: List[Dict]) -> str:
+    """Return a short plain-text summary for cron delivery."""
+    parts = []
+
+    if new_models:
+        parts.append(f"发现 {len(new_models)} 个新免费模型")
+    if expiring:
+        parts.append(f"有 {len(expiring)} 个模型带到期提示")
+    if fetch_errors:
+        parts.append(f"{len(fetch_errors)} 个模型到期页抓取失败")
+
+    if not parts:
+        return "OpenRouter 免费模型监控结果：无变化。当前免费模型列表与上次检查一致，无新增或到期模型。"
+
+    return "OpenRouter 免费模型监控结果：" + "，".join(parts) + "。"
 
 
 def main():
@@ -488,13 +540,18 @@ def main():
     
     # Check expiration notices
     expiring = []
+    fetch_errors = []
     for model_id in configured_models:
         result = check_expiration_notice(model_id, verbose)
         if result and "going_away_date" in result:
             expiring.append(result)
+        elif result and result.get("error"):
+            fetch_errors.append(result)
     
     if verbose:
         print(f"\nExpiring soon: {len(expiring)}")
+        if fetch_errors:
+            print(f"Fetch errors: {len(fetch_errors)}")
     
     # Discover new models
     all_free_models = set(discover_new_models(verbose))
@@ -502,7 +559,7 @@ def main():
     # Find new models (not in known list)
     new_models = []
     if all_free_models:
-        new_models = list(all_free_models - known_models - configured_models)
+        new_models = sorted(all_free_models - known_models - configured_models)
     
     if verbose:
         print(f"New models discovered: {len(new_models)}")
@@ -515,10 +572,11 @@ def main():
     send_new_models = len(new_models) > 0
     
     # Update status (only update known_models if discovery succeeded)
-    status["last_check"] = datetime.now().isoformat()
+    status["last_check"] = datetime.now(SHANGHAI_TZ).isoformat()
     if all_free_models:
-        status["known_models"] = list(configured_models | all_free_models)
+        status["known_models"] = sorted(set(status.get("known_models", [])) | configured_models | all_free_models)
     status["expiring_soon"] = expiring
+    status["fetch_errors"] = fetch_errors
     save_status(status)
     
     if verbose:
@@ -526,13 +584,22 @@ def main():
         print(f"Send expiration alert: {send_expiring} (level: {alert_level})")
         print(f"Send new models alert: {send_new_models}")
     
+    summary = summarize_check_result(expiring, new_models, fetch_errors)
+
     # Send notification if needed
     if send_expiring or send_new_models:
         message = format_notification(expiring if send_expiring else [], new_models if send_new_models else [], alert_level)
         send_feishu_notification(message, dry_run)
+    elif fetch_errors and verbose:
+        print("\n⚠ No model changes detected, but some expiration checks failed")
     else:
         print("\n✓ No changes detected (silent)")
-    
+
+    if verbose or dry_run:
+        print(f"\nSummary: {summary}")
+    else:
+        print(summary)
+
     return 0
 
 
