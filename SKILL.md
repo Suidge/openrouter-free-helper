@@ -341,4 +341,4 @@ openclaw cron edit
 ---
 
 **最后更新**: 2026-04-10  
-**维护者**: 银月 (Neo Shi)
+**维护者**: Silvermoon

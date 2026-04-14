@@ -1,8 +1,8 @@
 {
   "name": "openrouter-free-helper",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "监控 OpenRouter 免费模型的到期通知和新模型发现，自动每日检查并推送飞书通知",
-  "author": "Neo Shi <neoshi2346>",
+  "author": "Silvermoon",
   "license": "MIT",
   "keywords": [
     "openrouter",

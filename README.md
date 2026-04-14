@@ -327,6 +327,11 @@ The local Python script no longer pretends to call OpenClaw tools via subprocess
 
 ## 📝 更新日志 | Changelog
 
+### v1.0.5 (2026-04-14)
+- 🔕 Add `--no-notify` mode so cron runs do not send direct Feishu notifications from the script
+- 🧹 Update cron instructions to require a single final summary only, with no intermediate delivery wording
+- 🔐 Remove user-specific default notification target from published skill content
+
 ### v1.0.4 (2026-04-11)
 - 📝 Clarify that installing the skill does not auto-create a Cron job
 - ➕ Add explicit `openclaw cron add` setup guidance to README and SKILL.md
@@ -375,7 +380,7 @@ MIT License
 
 <div align="center">
 
-**Made with ❤️ by Neo Shi (银月)**
+**Made with ❤️ by Silvermoon**
 
 [⬆️ 返回顶部 | Back to Top](#openrouter-free-model-monitor)
 

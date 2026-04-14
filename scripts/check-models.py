@@ -6,7 +6,7 @@ Checks configured free models for expiration notices and discovers new models.
 Sends Feishu notification when changes detected.
 
 Usage:
-  python3 check-models.py [--verbose] [--dry-run]
+  python3 check-models.py [--verbose] [--dry-run] [--no-notify]
 """
 
 import json
@@ -65,7 +65,7 @@ def load_config() -> dict:
     # Default config
     return {
         "notify_channel": "feishu",
-        "notify_target": "user:ou_8072af07014ee36e1e66d6690be4d7",
+        "notify_target": "user:ou_xxxxxxxxxxxxxxxxxxxxx",
         "status_file": str(STATUS_FILE),
         "openclaw_config": str(OPENCLAW_CONFIG)
     }
@@ -348,7 +348,7 @@ def discover_new_models(verbose: bool = False) -> List[str]:
 def send_feishu_notification(message: str, dry_run: bool = False):
     """Send notification via Feishu"""
     config = load_config()
-    target = config.get("notify_target", "user:ou_8072af07014ee36e1e66d6690be4d7")
+    target = config.get("notify_target", "user:ou_xxxxxxxxxxxxxxxxxxxxx")
     
     if dry_run:
         print(f"\n[DRY RUN] Would send to Feishu: {target}")
@@ -515,6 +515,7 @@ def summarize_check_result(expiring: List[Dict], new_models: List[str], fetch_er
 def main():
     verbose = "--verbose" in sys.argv
     dry_run = "--dry-run" in sys.argv
+    no_notify = "--no-notify" in sys.argv
     
     if verbose:
         print("=" * 60)
@@ -587,9 +588,12 @@ def main():
     summary = summarize_check_result(expiring, new_models, fetch_errors)
 
     # Send notification if needed
-    if send_expiring or send_new_models:
+    if (send_expiring or send_new_models) and not no_notify:
         message = format_notification(expiring if send_expiring else [], new_models if send_new_models else [], alert_level)
         send_feishu_notification(message, dry_run)
+    elif (send_expiring or send_new_models) and no_notify:
+        if verbose:
+            print("\nℹ Notifications suppressed by --no-notify")
     elif fetch_errors and verbose:
         print("\n⚠ No model changes detected, but some expiration checks failed")
     else:
