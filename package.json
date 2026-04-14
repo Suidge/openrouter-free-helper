@@ -1,6 +1,6 @@
 {
   "name": "openrouter-free-helper",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "监控 OpenRouter 免费模型的到期通知和新模型发现，自动每日检查并推送飞书通知",
   "author": "Silvermoon",
   "license": "MIT",
