@@ -75,6 +75,8 @@ clawhub install openrouter-free-helper
 
 ### 启用自动化
 
+> ⚠️ **Cron 场景必须使用 `--no-notify`**，禁止脚本自行发送通知，统一交给 cron delivery 输出一次最终结果。
+
 技能安装后**不会自动创建 Cron 任务**。如需每日自动检查，请手动添加一条 Cron，并让它读取固定任务说明文件。
 
 示例：每日 08:00 执行
@@ -119,7 +121,12 @@ python3 ~/.openclaw/workspace/skills/openrouter-free-helper/scripts/check-models
 
 # 模拟运行（不发送通知）
 python3 ~/.openclaw/workspace/skills/openrouter-free-helper/scripts/check-models.py --verbose --dry-run
+
+# Cron / agent-run 场景：禁止脚本自行发通知，交给上层 delivery
+python3 ~/.openclaw/workspace/skills/openrouter-free-helper/scripts/check-models.py --no-notify
 ```
+
+> ⚠️ **Cron 场景必须使用 `--no-notify`**，否则脚本内通知与 cron delivery 可能重复发送。
 
 ### 查询 bb-browser 适配器
 
@@ -263,14 +270,16 @@ openclaw cron edit
 
 ### 添加更多监控模型
 
-编辑 `~/.openclaw/openclaw.json`，在 `defaults.models` 或 `agents[].model` 中添加 `:free` 后缀的模型 ID：
+编辑 `~/.openclaw/openclaw.json`，在 `agents.defaults.models` 或 `agents[].model` 中添加 `:free` 后缀的模型 ID：
 
 ```json
 {
-  "defaults": {
-    "models": {
-      "openrouter/google/gemma-4-26b-a4b-it:free": {...},
-      "openrouter/google/gemma-4-31b-it:free": {...}
+  "agents": {
+    "defaults": {
+      "models": {
+        "openrouter/google/gemma-4-26b-a4b-it:free": {},
+        "openrouter/google/gemma-4-31b-it:free": {}
+      }
     }
   }
 }
@@ -317,6 +326,11 @@ openclaw cron edit
 
 ## 📝 更新日志
 
+### v1.0.5 (2026-04-14)
+- 新增 `--no-notify` 模式，供 cron 场景避免脚本内直接发通知
+- 收紧 cron-task 规则，禁止中间态与“已推送”类措辞
+- 脱敏发布内容，移除用户特定默认通知目标
+
 ### v1.0.1 (2026-04-11)
 - 修正配置模型读取路径
 - 修正状态文件与 JSON 读取容错
@@ -336,7 +350,7 @@ openclaw cron edit
 
 ## 🤝 贡献
 
-问题反馈或功能建议，欢迎联系 @neoshi
+问题反馈或功能建议，欢迎通过 GitHub Issues 提交。
 
 ---
 

@@ -82,6 +82,8 @@ git clone https://github.com/Suidge/openrouter-free-helper.git \
 
 ### 添加 Cron 自动检查 | Add a Scheduled Cron Check
 
+> ⚠️ **Cron 场景必须使用 `--no-notify`**，避免脚本内通知与 cron delivery 重复。
+
 > 安装 skill **不会自动创建 Cron**。如果你需要每日自动运行，请手动添加。  
 > Installing the skill does **not** auto-create a Cron job. Add it manually if you want scheduled checks.
 
@@ -150,7 +152,13 @@ python3 scripts/check-models.py --verbose
 
 # 模拟运行 (不发送通知) | Dry run (no notifications)
 python3 scripts/check-models.py --verbose --dry-run
+
+# Cron / agent-run 场景：禁止脚本自行发通知，交给上层 delivery
+# Cron / agent-run mode: suppress script-side notifications and let outer delivery send once
+python3 scripts/check-models.py --no-notify
 ```
+
+> ⚠️ **Cron 场景必须使用 `--no-notify`**，否则脚本内通知与 cron delivery 可能重复发送。
 
 ### 使用 bb-browser 适配器 | Using bb-browser Adapters
 
