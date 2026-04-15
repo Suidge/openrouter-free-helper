@@ -16,7 +16,7 @@ import sys
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 try:
     from zoneinfo import ZoneInfo
@@ -112,26 +112,34 @@ def safe_load_json(path: Path) -> dict:
         return {}
 
 
-def get_configured_free_models() -> List[str]:
-    """Extract configured free models from openclaw.json"""
+def get_configured_models() -> Tuple[List[str], List[str]]:
+    """Extract configured free models and configured openrouter non-:free candidates from openclaw.json"""
     config = load_config()
     openclaw_config_path = Path(config.get("openclaw_config", str(OPENCLAW_CONFIG)))
     
     if not openclaw_config_path.exists():
         print(f"ERROR: OpenClaw config not found: {openclaw_config_path}", file=sys.stderr)
-        return []
+        return [], []
     
     data = safe_load_json(openclaw_config_path)
     if not data:
-        return []
+        return [], []
     
     free_models = []
+    openrouter_candidates = []
+
+    def collect_model_id(model_id: Optional[str]):
+        if not model_id:
+            return
+        if model_id.endswith(":free"):
+            free_models.append(model_id)
+        elif model_id.startswith("openrouter/"):
+            openrouter_candidates.append(model_id)
     
     # Check agents.defaults.models
     models_section = data.get("agents", {}).get("defaults", {}).get("models", {})
     for model_id in models_section.keys():
-        if model_id.endswith(":free"):
-            free_models.append(model_id)
+        collect_model_id(model_id)
     
     # Check agents.list[].model (for each agent)
     agents = data.get("agents", {}).get("list", [])
@@ -139,15 +147,34 @@ def get_configured_free_models() -> List[str]:
         model_config = agent.get("model", {})
         primary = model_config.get("primary")
         fallbacks = model_config.get("fallbacks", [])
-        
-        if primary and primary.endswith(":free"):
-            free_models.append(primary)
+        collect_model_id(primary)
         for fb in fallbacks:
-            if fb.endswith(":free"):
-                free_models.append(fb)
+            collect_model_id(fb)
     
-    # Deduplicate while preserving stable order
-    return sorted(set(free_models))
+    return sorted(set(free_models)), sorted(set(openrouter_candidates))
+
+
+def page_looks_free(model_id: str, verbose: bool = False) -> bool:
+    """Lightweight heuristic: treat configured openrouter model as free if its model page clearly signals Free/$0."""
+    url = MODEL_URL_TEMPLATE.format(model_id=model_id)
+    html = fetch_page(url, verbose)
+    if not html:
+        return False
+
+    text = re.sub(r"\s+", " ", html).lower()
+    markers = [
+        '>free<',
+        '$0',
+        'free to use',
+        '0 credits',
+        'input: $0',
+        'output: $0',
+        'free model'
+    ]
+    matched = any(marker in text for marker in markers)
+    if verbose and matched:
+        print(f"  ✓ Page probe marked as free: {model_id}")
+    return matched
 
 
 def check_expiration_notice(model_id: str, verbose: bool = False) -> Optional[Dict]:
@@ -531,13 +558,24 @@ def main():
         print(f"Last check: {last_check or 'Never'}")
         print(f"Known models: {len(known_models)}")
     
-    # Get configured free models
-    configured_models = set(get_configured_free_models())
+    # Get configured free models + configured openrouter non-:free candidates
+    configured_free_models, configured_openrouter_candidates = get_configured_models()
+    configured_models = set(configured_free_models)
+
+    lightweight_detected = []
+    for model_id in configured_openrouter_candidates:
+        if page_looks_free(model_id, verbose):
+            configured_models.add(model_id)
+            lightweight_detected.append(model_id)
     
     if verbose:
         print(f"Configured free models: {len(configured_models)}")
         for m in configured_models:
             print(f"  - {m}")
+        if lightweight_detected:
+            print(f"Lightweight free detection matched: {len(lightweight_detected)}")
+            for m in lightweight_detected:
+                print(f"  - {m}")
     
     # Check expiration notices
     expiring = []

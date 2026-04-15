@@ -335,6 +335,11 @@ The local Python script no longer pretends to call OpenClaw tools via subprocess
 
 ## 📝 更新日志 | Changelog
 
+### v1.0.7 (2026-04-15)
+- 🧭 Add lightweight free-page probing for configured `openrouter/*` models that do not use the `:free` suffix
+- 🔕 Harden cron prompt to force `--no-notify` and discourage duplicate relay after async exec completion
+- 🩹 Keep the detection strategy intentionally lightweight, avoiding full pricing-system complexity
+
 ### v1.0.5 (2026-04-14)
 - 🔕 Add `--no-notify` mode so cron runs do not send direct Feishu notifications from the script
 - 🧹 Update cron instructions to require a single final summary only, with no intermediate delivery wording

@@ -326,6 +326,11 @@ openclaw cron edit
 
 ## 📝 更新日志
 
+### v1.0.7 (2026-04-15)
+- 为已配置但未带 `:free` 后缀的 `openrouter/*` 模型增加轻量页面探测，补抓“实际免费但未显式标 free”的模型
+- 收紧 cron prompt，强制 `--no-notify` 并避免 async exec completion 后重复转述
+- 保持检测策略轻量，不引入完整 pricing 系统复杂度
+
 ### v1.0.5 (2026-04-14)
 - 新增 `--no-notify` 模式，供 cron 场景避免脚本内直接发通知
 - 收紧 cron-task 规则，禁止中间态与“已推送”类措辞
