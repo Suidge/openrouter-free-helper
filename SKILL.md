@@ -326,6 +326,11 @@ openclaw cron edit
 
 ## 📝 更新日志
 
+### v1.0.8 (2026-04-16)
+- 摘要输出现在包含具体的模型名称和到期详情（不再只说数量）
+- 收紧 cron prompt，禁止 async exec completion 后输出任何消息（不只是禁止重复摘要）
+- 给 cron 命令加 `--verbose` 让模型能看到详细信息并整合到最终摘要
+
 ### v1.0.7 (2026-04-15)
 - 为已配置但未带 `:free` 后缀的 `openrouter/*` 模型增加轻量页面探测，补抓“实际免费但未显式标 free”的模型
 - 收紧 cron prompt，强制 `--no-notify` 并避免 async exec completion 后重复转述

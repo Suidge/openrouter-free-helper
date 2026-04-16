@@ -523,13 +523,22 @@ def should_send_expiration_alert(current_expiring: List[Dict], previous_expiring
 
 
 def summarize_check_result(expiring: List[Dict], new_models: List[str], fetch_errors: List[Dict]) -> str:
-    """Return a short plain-text summary for cron delivery."""
+    """Return a short plain-text summary for cron delivery with specific model details."""
     parts = []
 
     if new_models:
-        parts.append(f"发现 {len(new_models)} 个新免费模型")
+        model_list = ", ".join(new_models[:5])
+        if len(new_models) > 5:
+            model_list += f" 等{len(new_models)}个"
+        parts.append(f"发现 {len(new_models)} 个新免费模型: {model_list}")
     if expiring:
-        parts.append(f"有 {len(expiring)} 个模型带到期提示")
+        exp_list = []
+        for item in expiring[:3]:
+            model = item.get("model", "Unknown")
+            date = item.get("going_away_date", "Unknown")
+            days = item.get("days_left", 0)
+            exp_list.append(f"{model}将于{date}到期(剩{days}天)")
+        parts.append(f"有 {len(expiring)} 个模型即将到期: " + ", ".join(exp_list))
     if fetch_errors:
         parts.append(f"{len(fetch_errors)} 个模型到期页抓取失败")
 

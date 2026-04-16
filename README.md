@@ -335,6 +335,11 @@ The local Python script no longer pretends to call OpenClaw tools via subprocess
 
 ## 📝 更新日志 | Changelog
 
+### v1.0.8 (2026-04-16)
+- 🔔 Improve summary output to include specific model names and expiration details
+- 🔕 Harder cron prompt to forbid any output after async exec completion (not just duplicate summary)
+- 📋 Add `--verbose` to cron command so agent can see detailed discovery info
+
 ### v1.0.7 (2026-04-15)
 - 🧭 Add lightweight free-page probing for configured `openrouter/*` models that do not use the `:free` suffix
 - 🔕 Harden cron prompt to force `--no-notify` and discourage duplicate relay after async exec completion
