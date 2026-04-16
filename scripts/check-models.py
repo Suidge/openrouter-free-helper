@@ -305,7 +305,7 @@ def ensure_chrome_debug_mode(verbose: bool = False) -> bool:
 def discover_new_models(verbose: bool = False) -> List[str]:
     """
     Discover new free models from OpenRouter.
-    Auto-starts Chrome debug mode if needed, falls back to API.
+    API-first, with bb-browser as fallback.
     Returns list of new model IDs.
     """
     if verbose:
@@ -313,7 +313,33 @@ def discover_new_models(verbose: bool = False) -> List[str]:
     
     models = []
     
-    # Try bb-browser adapter first (requires Chrome in debug mode)
+    # First: OpenRouter API (fast, stable, no Chrome dependency)
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            "https://openrouter.ai/api/frontend/models",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+            if isinstance(data, dict) and "data" in data:
+                api_models = []
+                for m in data["data"]:
+                    endpoint = m.get("endpoint") or {}
+                    if endpoint.get("is_free") and m.get("slug"):
+                        api_models.append(m.get("slug", ""))
+                api_models = sorted(set(api_models))
+                if verbose:
+                    print(f"  ✓ API: Found {len(api_models)} free models")
+                return api_models
+    except Exception as e:
+        if verbose:
+            print(f"  ⚠ API failed: {e}")
+    
+    # Fallback: bb-browser adapter (requires Chrome debug mode)
+    if verbose:
+        print(f"  Trying bb-browser fallback...")
+    
     if ensure_chrome_debug_mode(verbose):
         try:
             result = subprocess.run(
@@ -340,32 +366,6 @@ def discover_new_models(verbose: bool = False) -> List[str]:
         except Exception as e:
             if verbose:
                 print(f"  ⚠ bb-browser error: {e}")
-    
-    # Fallback: use OpenRouter internal API directly
-    if verbose:
-        print(f"  Trying API fallback...")
-    
-    try:
-        import urllib.request
-        req = urllib.request.Request(
-            "https://openrouter.ai/api/frontend/models",
-            headers={"User-Agent": "Mozilla/5.0"}
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
-            if isinstance(data, dict) and "data" in data:
-                api_models = []
-                for m in data["data"]:
-                    endpoint = m.get("endpoint") or {}
-                    if endpoint.get("is_free") and m.get("slug"):
-                        api_models.append(m.get("slug", ""))
-                api_models = sorted(set(api_models))
-                if verbose:
-                    print(f"  ✓ API: Found {len(api_models)} free models")
-                return api_models
-    except Exception as e:
-        if verbose:
-            print(f"  ⚠ API fallback failed: {e}")
     
     if verbose:
         print(f"  ⚠ All discovery methods failed")

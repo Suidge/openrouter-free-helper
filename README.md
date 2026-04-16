@@ -335,6 +335,9 @@ The local Python script no longer pretends to call OpenClaw tools via subprocess
 
 ## 📝 更新日志 | Changelog
 
+### v1.0.9 (2026-04-16)
+- 🔄 Switch discovery order: API-first, bb-browser fallback (more stable, no Chrome dependency for primary path)
+
 ### v1.0.8 (2026-04-16)
 - 🔔 Improve summary output to include specific model names and expiration details
 - 🔕 Harder cron prompt to forbid any output after async exec completion (not just duplicate summary)

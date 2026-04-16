@@ -326,6 +326,9 @@ openclaw cron edit
 
 ## 📝 更新日志
 
+### v1.0.9 (2026-04-16)
+- 调整发现顺序：API 优先，bb-browser 作为 fallback（更稳定，主路径不依赖 Chrome）
+
 ### v1.0.8 (2026-04-16)
 - 摘要输出现在包含具体的模型名称和到期详情（不再只说数量）
 - 收紧 cron prompt，禁止 async exec completion 后输出任何消息（不只是禁止重复摘要）
