@@ -326,8 +326,8 @@ def discover_new_models(verbose: bool = False) -> List[str]:
                 api_models = []
                 for m in data["data"]:
                     endpoint = m.get("endpoint") or {}
-                    if endpoint.get("is_free") and m.get("slug"):
-                        api_models.append(m.get("slug", ""))
+                    if endpoint.get("is_free") and endpoint.get("model_variant_slug"):
+                        api_models.append(endpoint.get("model_variant_slug", ""))
                 api_models = sorted(set(api_models))
                 if verbose:
                     print(f"  ✓ API: Found {len(api_models)} free models")
@@ -356,7 +356,7 @@ def discover_new_models(verbose: bool = False) -> List[str]:
                     data = raw
                 
                 if isinstance(data, dict) and "models" in data:
-                    models = [m.get("slug", "") for m in data["models"] if m.get("slug")]
+                    models = [m.get("model_variant_slug") or m.get("slug", "") for m in data["models"] if m.get("model_variant_slug") or m.get("slug")]
                     if verbose:
                         print(f"  ✓ bb-browser: Found {len(models)} free models")
                     return models
