@@ -326,6 +326,9 @@ openclaw cron edit
 
 ## 📝 更新日志
 
+### v1.0.10 (2026-05-09)
+- 修正新模型发现链路：使用 `endpoint.model_variant_slug` 替代顶层 `slug`，确保返回带 `:free` 后缀的完整端点 ID
+
 ### v1.0.9 (2026-04-16)
 - 调整发现顺序：API 优先，bb-browser 作为 fallback（更稳定，主路径不依赖 Chrome）
 
